@@ -898,6 +898,7 @@ status_t IPCThreadState::talkWithDriver(bool doReceive)
     }
 
     binder_write_read bwr;
+    Parcel mOutCopy;
 
     // Is the read buffer empty?
     const bool needRead = mIn.dataPosition() >= mIn.dataSize();
@@ -909,6 +910,7 @@ status_t IPCThreadState::talkWithDriver(bool doReceive)
 
     bwr.write_size = outAvail;
     bwr.write_buffer = (uintptr_t)mOut.data();
+    mOutCopy.setData(mOut.data(), mOut.dataSize());
 
     // This is what we'll read.
     if (doReceive && needRead) {
@@ -966,6 +968,11 @@ status_t IPCThreadState::talkWithDriver(bool doReceive)
 
     if (err >= NO_ERROR) {
         if (bwr.write_consumed > 0) {
+            if (bwr.write_consumed < mOut.dataSize()) {
+                ALOGE("%s: >>>>>>>> SOMEHOW RACING OCCURRED!! Attempt to fix mOut(%p) using mOutCopy(%p)! mOut.dataSize:%d mOutCopy.dataSize:%d <<<<<<<",
+                    __func__, &mOut, &mOutCopy, mOut.dataSize(), mOutCopy.dataSize());
+                mOut.setData(mOutCopy.data(), mOutCopy.dataSize());
+            }
             if (bwr.write_consumed < mOut.dataSize())
                 mOut.remove(0, bwr.write_consumed);
             else {
